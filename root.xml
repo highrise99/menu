@@ -1,8 +1,0 @@
-<root>
-  <menu id="foo">
-    <description>foo</description>
-    <option return="2">Do Something</option>
-    <option return="3">Do Something Else</option>
-    <option return="1">Exit</option>
-  </menu>
-</root>

@@ -29,6 +29,7 @@ class Menu {
   char FileGet();
   bool IsIllegalTagOrAttributeStart(char);
   bool IsFatalTagOrAttributeStartError(char);
+  pair<FindState, char> ParseLegalAttributeEndOrDie(char);
   pair<FindState, char> FindStartOrParseLegalOrDie(const char *);
   bool IsIllegalTagOrAttributeCharacter(char);
   void IllegalTagOrAttributeCharacter(char);

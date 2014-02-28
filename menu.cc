@@ -157,30 +157,58 @@ bool Menu::IsFatalCharacterError(char c) {
   }
   return false;
 }
+pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
+    char attribute_end_character) {
+  if (IsFatalFileError()) {
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  if (IsIllegalTagOrAttributeCharacter(attribute_end_character)
+      && attribute_end_character != '=') {
+    IllegalTagOrAttributeCharacter(attribute_end_character);
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  /* Attribute values must open either with an apostrophe or a
+   * quotation mark.
+   */
+  attribute_end_character = FileGet();
+  if (IsFatalFileError()) {
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  if (attribute_end_character != '\'' && attribute_end_character != '\"') {
+    cout <<
+    "Error: \'" <<
+    attribute_end_character <<
+    "\' at line " <<
+    line <<
+    " and column " <<
+    column <<
+    " of the file \"" <<
+    file_name <<
+    "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
+    cin.ignore();
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  /* Attribute values must open and close with the same thing.
+   */
+  char attribute_value_start = attribute_end_character;
+  do {
+    attribute_end_character = FileGet();
+  }
+  while (!IsBadOrEndOfFile() &&
+         !IsIllegalCharacter(attribute_end_character) &&
+         attribute_end_character != attribute_value_start);
+  if (IsFatalFileError()) {
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  if (IsIllegalCharacter(attribute_end_character) &&
+      attribute_end_character != attribute_value_start) {
+    if (IsFatalCharacterError(attribute_end_character)) {
+      return make_pair(kFatalError, attribute_end_character);
+    }
+  }
+  return make_pair(kParsedLegal, FileGet());
+}
 Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
-  /*char tag_start_character = FileGet();
-  const char *kMenuTagStart = "menu ";
-  bool found = true;
-  if (tag_start_character != kMenuTagStart[0]) {
-    if (IsFatalTagOrAttributeStartError(tag_start_character)) {
-      return 0;
-    }
-    found = false;
-  }
-  else {
-    for (int menu_tag_start_element = 1;
-         menu_tag_start_element < strlen(kMenuTagStart);
-         ++menu_tag_start_element) {
-      tag_start_character = FileGet();
-      if (tag_start_character != kMenuTagStart[menu_tag_start_element]) {
-        found = false;
-        break;
-      }
-    }
-  }
-  if (found) {
-    return 1;
-  }*/
   pair<FindState, char> tmp = FindStartOrParseLegalOrDie("menu ");
   switch (tmp.first) {
     case kFatalError: {
@@ -224,54 +252,68 @@ Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
             while (!IsBadOrEndOfFile() &&
                    !IsIllegalTagOrAttributeCharacter(
                        tag_start_character));
-            if (IsFatalFileError()) {
-              return kFatalError;
-            }
-            if (IsIllegalTagOrAttributeCharacter(tag_start_character)
-                && tag_start_character != '=') {
-              IllegalTagOrAttributeCharacter(tag_start_character);
-              return kFatalError;
-            }
-            /* Attribute values must open either with an apostrophe or a
-             * quotation mark.
-             */
-            tag_start_character = FileGet();
-            if (IsFatalFileError()) {
-              return kFatalError;
-            }
-            if (tag_start_character != '\'' && tag_start_character != '\"') {
-              cout <<
-              "Error: \'" <<
-              tag_start_character <<
-              "\' at line " <<
-              line <<
-              " and column " <<
-              column <<
-              " of the file \"" <<
-              file_name <<
-              "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
-              cin.ignore();
-              return kFatalError;
-            }
-            /* Attribute values must open and close with the same thing.
-             */
-            char attribute_value_start = tag_start_character;
-            do {
-              tag_start_character = FileGet();
-            }
-            while (!IsBadOrEndOfFile() &&
-                   !IsIllegalCharacter(tag_start_character) &&
-                   tag_start_character != attribute_value_start);
-            if (IsFatalFileError()) {
-              return kFatalError;
-            }
-            if (IsIllegalCharacter(tag_start_character) &&
-                tag_start_character != attribute_value_start) {
-              if (IsFatalCharacterError(tag_start_character)) {
+            pair<FindState, char> tmp =
+              ParseLegalAttributeEndOrDie(tag_start_character);
+            switch (tmp.first) {
+              case kFatalError: {
+                return kFatalError;
+              }
+              case kParsedLegal: {
+                tag_start_character = tmp.second;
+                break;
+              }
+              default: {
                 return kFatalError;
               }
             }
-            tag_start_character = FileGet();
+//            if (IsFatalFileError()) {
+//              return kFatalError;
+//            }
+//            if (IsIllegalTagOrAttributeCharacter(tag_start_character)
+//                && tag_start_character != '=') {
+//              IllegalTagOrAttributeCharacter(tag_start_character);
+//              return kFatalError;
+//            }
+//            /* Attribute values must open either with an apostrophe or a
+//             * quotation mark.
+//             */
+//            tag_start_character = FileGet();
+//            if (IsFatalFileError()) {
+//              return kFatalError;
+//            }
+//            if (tag_start_character != '\'' && tag_start_character != '\"') {
+//              cout <<
+//              "Error: \'" <<
+//              tag_start_character <<
+//              "\' at line " <<
+//              line <<
+//              " and column " <<
+//              column <<
+//              " of the file \"" <<
+//              file_name <<
+//              "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
+//              cin.ignore();
+//              return kFatalError;
+//            }
+//            /* Attribute values must open and close with the same thing.
+//             */
+//            char attribute_value_start = tag_start_character;
+//            do {
+//              tag_start_character = FileGet();
+//            }
+//            while (!IsBadOrEndOfFile() &&
+//                   !IsIllegalCharacter(tag_start_character) &&
+//                   tag_start_character != attribute_value_start);
+//            if (IsFatalFileError()) {
+//              return kFatalError;
+//            }
+//            if (IsIllegalCharacter(tag_start_character) &&
+//                tag_start_character != attribute_value_start) {
+//              if (IsFatalCharacterError(tag_start_character)) {
+//                return kFatalError;
+//              }
+//            }
+//            tag_start_character = FileGet();
           }
           return kParsedLegal;
         }
@@ -302,6 +344,34 @@ void Menu::FoundMenuTag() {
   "\". Press Enter to continue.";
   cin.ignore();
 #endif
+//  pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
+//  switch (tmp.first) {
+//    case kFatalError: {
+//      return 0;
+//    }
+//    case kFound: {
+//      // TODO (Matthew)
+//    }
+//    case kParsedLegal: {
+//      char menu_identification_attribute_start_character;
+//      while (!IsBadOrEndOfFile() &&
+//             !IsIllegalTagOrAttributeCharacter(
+//                 menu_identification_start_character)) {
+//        menu_identification_start_character = FileGet();
+//      }
+//      if (IsFatalFileError()) {
+//        return kFatalError;
+//      }
+//      if (menu_identification_character == '=') {
+//        // TODO (Matthew)
+//      }
+//      else {
+//      }
+//    }
+//    default: {
+//      return 0;
+//    }
+//  }
 }
 int Menu::RequestOrDie() {
   menu_file.open(file_name.c_str());
@@ -357,6 +427,9 @@ int Menu::RequestOrDie() {
         }
         case kParsedLegal: {
           break;
+        }
+        default: {
+          return 0;
         }
       }
     }
