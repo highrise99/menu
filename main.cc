@@ -9,6 +9,7 @@ int main() {
       return EXIT_FAILURE;
     }
     case 1: {
+      cin.ignore();
       return EXIT_SUCCESS;
     }
     default: {

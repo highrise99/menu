@@ -343,66 +343,80 @@ Menu::FindState Menu::FoundMenuTag() {
   "\". Press Enter to continue.";
   cin.ignore();
 #endif
-  while (
-  pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
-  switch (tmp.first) {
-    case kFatalError: {
-      return kFatalError;
-    }
-    case kFound: {
-      // TODO (Matthew)
-      return kFound;
-    }
-    case kParsedLegal: {
-      char menu_identification_attribute_start_character = tmp.second;
-      while (!IsBadOrEndOfFile() &&
-             !IsIllegalTagOrAttributeCharacter(
-                 menu_identification_attribute_start_character)) {
-        menu_identification_attribute_start_character = FileGet();
+  while (!IsBadOrEndOfFile()) {
+    pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
+    switch (tmp.first) {
+      case kFatalError: {
+        return kFatalError;
       }
-      tmp = ParseLegalAttributeEndOrDie(
-          menu_identification_attribute_start_character);
-      switch (tmp.first) {
-        case kFatalError: {
-          return kFatalError;
+      case kFound: {
+        // TODO (Matthew)
+#ifdef DEBUG
+        cout <<
+        "A menu identification attribute is found at line " <<
+        line <<
+        " and column " <<
+        column <<
+        " of the file \"" <<
+        file_name <<
+        "\". Press Enter to continue.";
+#endif
+        return kFound;
+      }
+      case kParsedLegal: {
+        char menu_identification_attribute_start_character = tmp.second;
+        while (!IsBadOrEndOfFile() &&
+               !IsIllegalTagOrAttributeCharacter(
+                   menu_identification_attribute_start_character)) {
+          menu_identification_attribute_start_character = FileGet();
         }
-        case kParsedLegal: {
-//          menu_identification_attribute_start_character = tmp.second;
-          switch (tmp.second) {
-            case ' ': {
-            }
-            case '>': {
-              return kParsedLegal;
-            }
-            default: {
-              if (IsFatalTagOrAttributeCharacterError(tag_start_character)) {
-                return kFatalError;
+        tmp = ParseLegalAttributeEndOrDie(
+            menu_identification_attribute_start_character);
+        switch (tmp.first) {
+          case kFatalError: {
+            return kFatalError;
+          }
+          case kParsedLegal: {
+            menu_identification_attribute_start_character = tmp.second;
+            switch (menu_identification_attribute_start_character) {
+              case ' ': {
+                continue;
+              }
+              case '>': {
+                return kParsedLegal;
+              }
+              default: {
+                if (IsFatalTagOrAttributeCharacterError(
+                    menu_identification_attribute_start_character)) {
+                  return kFatalError;
+                }
               }
             }
+            break;
           }
-          break;
+          default: {
+            return kFatalError;
+          }
         }
-        default: {
-          return kFatalError;
+        switch (ParseLegalAttributesUntilTagEndOrDie(
+            menu_identification_attribute_start_character)) {
+          case kFatalError: {
+            return kFatalError;
+          }
+          case kParsedLegal: {
+            return kParsedLegal;
+          }
+          default: {
+            return kFatalError;
+          }
         }
       }
-      switch (ParseLegalAttributesUntilTagEndOrDie(
-          menu_identification_attribute_start_character)) {
-        case kFatalError: {
-          return kFatalError;
-        }
-        case kParsedLegal: {
-          return kParsedLegal;
-        }
-        default: {
-          return kFatalError;
-        }
+      default: {
+        return kFatalError;
       }
-    }
-    default: {
-      return kFatalError;
     }
   }
+  return kFatalError;
 }
 int Menu::RequestOrDie() {
   menu_file.open(file_name.c_str());
