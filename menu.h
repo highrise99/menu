@@ -30,6 +30,7 @@ class Menu {
   bool IsIllegalTagOrAttributeStart(char);
   bool IsFatalTagOrAttributeStartError(char);
   pair<FindState, char> ParseLegalAttributeEndOrDie(char);
+  FindState ParseLegalAttributesUntilTagEndOrDie(char);
   pair<FindState, char> FindStartOrParseLegalOrDie(const char *);
   bool IsIllegalTagOrAttributeCharacter(char);
   void IllegalTagOrAttributeCharacter(char);
@@ -37,7 +38,7 @@ class Menu {
   bool IsIllegalCharacter(char);
   bool IsFatalCharacterError(char);
   FindState FindMenuTagStartOrParseLegalOrDie();
-  void FoundMenuTag();
+  FindState FoundMenuTag();
   const string file_name;
   const string menu_name;
   ifstream menu_file;

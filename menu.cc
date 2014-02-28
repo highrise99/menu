@@ -208,6 +208,42 @@ pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
   }
   return make_pair(kParsedLegal, FileGet());
 }
+Menu::FindState Menu::ParseLegalAttributesUntilTagEndOrDie(char c) {
+  while (!IsBadOrEndOfFile() && c != '>') {
+    /* Attributes must start with a letter or an underscore.
+     */
+    c = FileGet();
+    if (IsFatalFileError()) {
+      return kFatalError;
+    }
+    if (IsFatalTagOrAttributeStartError(c)) {
+      return kFatalError;
+    }
+    /* Attributes must be formed only of letters, numbers, and
+     * underscores. They must be followed immediately by an equals
+     * sign.
+     */
+    do {
+      c = FileGet();
+    }
+    while (!IsBadOrEndOfFile() &&
+           !IsIllegalTagOrAttributeCharacter(c));
+    pair<FindState, char> tmp = ParseLegalAttributeEndOrDie(c);
+    switch (tmp.first) {
+      case kFatalError: {
+        return kFatalError;
+      }
+      case kParsedLegal: {
+        c = tmp.second;
+        break;
+      }
+      default: {
+        return kFatalError;
+      }
+    }
+  }
+  return kParsedLegal;
+}
 Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
   pair<FindState, char> tmp = FindStartOrParseLegalOrDie("menu ");
   switch (tmp.first) {
@@ -232,90 +268,53 @@ Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
            * end of the file is reached, attributes are parsed for syntax
            * errors.
            */
-          while (!IsBadOrEndOfFile() && tag_start_character != '>') {
-            /* Attributes must start with a letter or an underscore.
-             */
-            tag_start_character = FileGet();
-            if (IsFatalFileError()) {
-              return kFatalError;
-            }
-            if (IsFatalTagOrAttributeStartError(tag_start_character)) {
-              return kFatalError;
-            }
-            /* Attributes must be formed only of letters, numbers, and
-             * underscores. They must be followed immediately by an equals
-             * sign.
-             */
-            do {
-              tag_start_character = FileGet();
-            }
-            while (!IsBadOrEndOfFile() &&
-                   !IsIllegalTagOrAttributeCharacter(
-                       tag_start_character));
-            pair<FindState, char> tmp =
-              ParseLegalAttributeEndOrDie(tag_start_character);
-            switch (tmp.first) {
-              case kFatalError: {
-                return kFatalError;
-              }
-              case kParsedLegal: {
-                tag_start_character = tmp.second;
-                break;
-              }
-              default: {
-                return kFatalError;
-              }
-            }
-//            if (IsFatalFileError()) {
-//              return kFatalError;
-//            }
-//            if (IsIllegalTagOrAttributeCharacter(tag_start_character)
-//                && tag_start_character != '=') {
-//              IllegalTagOrAttributeCharacter(tag_start_character);
-//              return kFatalError;
-//            }
-//            /* Attribute values must open either with an apostrophe or a
-//             * quotation mark.
+//          while (!IsBadOrEndOfFile() && tag_start_character != '>') {
+//            /* Attributes must start with a letter or an underscore.
 //             */
 //            tag_start_character = FileGet();
 //            if (IsFatalFileError()) {
 //              return kFatalError;
 //            }
-//            if (tag_start_character != '\'' && tag_start_character != '\"') {
-//              cout <<
-//              "Error: \'" <<
-//              tag_start_character <<
-//              "\' at line " <<
-//              line <<
-//              " and column " <<
-//              column <<
-//              " of the file \"" <<
-//              file_name <<
-//              "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
-//              cin.ignore();
+//            if (IsFatalTagOrAttributeStartError(tag_start_character)) {
 //              return kFatalError;
 //            }
-//            /* Attribute values must open and close with the same thing.
+//            /* Attributes must be formed only of letters, numbers, and
+//             * underscores. They must be followed immediately by an equals
+//             * sign.
 //             */
-//            char attribute_value_start = tag_start_character;
 //            do {
 //              tag_start_character = FileGet();
 //            }
 //            while (!IsBadOrEndOfFile() &&
-//                   !IsIllegalCharacter(tag_start_character) &&
-//                   tag_start_character != attribute_value_start);
-//            if (IsFatalFileError()) {
-//              return kFatalError;
-//            }
-//            if (IsIllegalCharacter(tag_start_character) &&
-//                tag_start_character != attribute_value_start) {
-//              if (IsFatalCharacterError(tag_start_character)) {
+//                   !IsIllegalTagOrAttributeCharacter(
+//                       tag_start_character));
+//            pair<FindState, char> tmp =
+//              ParseLegalAttributeEndOrDie(tag_start_character);
+//            switch (tmp.first) {
+//              case kFatalError: {
+//                return kFatalError;
+//              }
+//              case kParsedLegal: {
+//                tag_start_character = tmp.second;
+//                break;
+//              }
+//              default: {
 //                return kFatalError;
 //              }
 //            }
-//            tag_start_character = FileGet();
+//          }
+//          return kParsedLegal;
+          switch(ParseLegalAttributesUntilTagEndOrDie(tag_start_character)) {
+            case kFatalError: {
+              return kFatalError;
+            }
+            case kParsedLegal: {
+              return kParsedLegal;
+            }
+            default: {
+              return kFatalError;
+            }
           }
-          return kParsedLegal;
         }
         case '>': {
           return kParsedLegal;
@@ -332,7 +331,7 @@ Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
     }
   }
 } 
-void Menu::FoundMenuTag() {
+Menu::FindState Menu::FoundMenuTag() {
 #ifdef DEBUG
   cout <<
   "The start of a menu tag is found at line " <<
@@ -344,34 +343,53 @@ void Menu::FoundMenuTag() {
   "\". Press Enter to continue.";
   cin.ignore();
 #endif
-//  pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
-//  switch (tmp.first) {
-//    case kFatalError: {
-//      return 0;
-//    }
-//    case kFound: {
-//      // TODO (Matthew)
-//    }
-//    case kParsedLegal: {
-//      char menu_identification_attribute_start_character;
-//      while (!IsBadOrEndOfFile() &&
-//             !IsIllegalTagOrAttributeCharacter(
-//                 menu_identification_start_character)) {
-//        menu_identification_start_character = FileGet();
-//      }
-//      if (IsFatalFileError()) {
-//        return kFatalError;
-//      }
-//      if (menu_identification_character == '=') {
-//        // TODO (Matthew)
-//      }
-//      else {
-//      }
-//    }
-//    default: {
-//      return 0;
-//    }
-//  }
+  pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
+  switch (tmp.first) {
+    case kFatalError: {
+      return kFatalError;
+    }
+    case kFound: {
+      // TODO (Matthew)
+      return kFound;
+    }
+    case kParsedLegal: {
+      char menu_identification_attribute_start_character = tmp.second;
+      while (!IsBadOrEndOfFile() &&
+             !IsIllegalTagOrAttributeCharacter(
+                 menu_identification_attribute_start_character)) {
+        menu_identification_attribute_start_character = FileGet();
+      }
+      tmp = ParseLegalAttributeEndOrDie(
+          menu_identification_attribute_start_character);
+      switch (tmp.first) {
+        case kFatalError: {
+          return kFatalError;
+        }
+        case kParsedLegal: {
+          menu_identification_attribute_start_character = tmp.second;
+          break;
+        }
+        default: {
+          return kFatalError;
+        }
+      }
+      switch (ParseLegalAttributesUntilTagEndOrDie(
+          menu_identification_attribute_start_character)) {
+        case kFatalError: {
+          return kFatalError;
+        }
+        case kParsedLegal: {
+          return kParsedLegal;
+        }
+        default: {
+          return kFatalError;
+        }
+      }
+    }
+    default: {
+      return kFatalError;
+    }
+  }
 }
 int Menu::RequestOrDie() {
   menu_file.open(file_name.c_str());
