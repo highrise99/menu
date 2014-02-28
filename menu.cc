@@ -343,6 +343,7 @@ Menu::FindState Menu::FoundMenuTag() {
   "\". Press Enter to continue.";
   cin.ignore();
 #endif
+  while (
   pair<FindState, char> tmp = FindStartOrParseLegalOrDie("id=");
   switch (tmp.first) {
     case kFatalError: {
@@ -366,7 +367,19 @@ Menu::FindState Menu::FoundMenuTag() {
           return kFatalError;
         }
         case kParsedLegal: {
-          menu_identification_attribute_start_character = tmp.second;
+//          menu_identification_attribute_start_character = tmp.second;
+          switch (tmp.second) {
+            case ' ': {
+            }
+            case '>': {
+              return kParsedLegal;
+            }
+            default: {
+              if (IsFatalTagOrAttributeCharacterError(tag_start_character)) {
+                return kFatalError;
+              }
+            }
+          }
           break;
         }
         default: {
