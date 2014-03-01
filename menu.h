@@ -10,10 +10,10 @@
 using namespace std;
 class Menu {
  public:
-  unsigned int line;
-  unsigned int column;
   Menu(const char *, const char *);
   int RequestOrDie();
+  unsigned int line;
+  unsigned int column;
  private:
   enum FileState {
     kGood = 0,
@@ -42,8 +42,10 @@ class Menu {
   bool IsFatalCharacterError(char);
   FindState FindMenuTagStartOrParseLegalOrDie();
   FindState FindMenuIdentificationValueOrParseLegalOrDie();
+  pair<FindState, string> GetTagOrParseLegalOrDie();
   const string file_name;
   const string menu_name;
   ifstream menu_file;
+  string description;
 };
 #endif

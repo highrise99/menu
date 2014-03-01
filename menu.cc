@@ -397,8 +397,10 @@ Menu::FindState Menu::FindMenuIdentificationValueOrParseLegalOrDie() {
         char menu_identification_value_start_character = FileGet();
         string menu_identification_value = menu_name +
         first_menu_identification_value_character;
-        if (menu_identification_value_start_character != menu_identification_value[0]) {
-          if (IsFatalCharacterError(menu_identification_value_start_character)) {
+        if (menu_identification_value_start_character !=
+            menu_identification_value[0]) {
+          if (IsFatalCharacterError(
+              menu_identification_value_start_character)) {
             return kFatalError;
           }
           found = false;
@@ -408,7 +410,8 @@ Menu::FindState Menu::FindMenuIdentificationValueOrParseLegalOrDie() {
                start_element < menu_identification_value.length();
                ++start_element) {
             menu_identification_value_start_character = FileGet();
-            if (menu_identification_value_start_character != menu_identification_value[start_element]) {
+            if (menu_identification_value_start_character !=
+                menu_identification_value[start_element]) {
               found = false;
               break;
             }
@@ -416,8 +419,10 @@ Menu::FindState Menu::FindMenuIdentificationValueOrParseLegalOrDie() {
         }
         if (!found) {
           while (!IsBadOrEndOfFile() &&
-                 !IsIllegalTagOrAttributeCharacter(menu_identification_value_start_character) &&
-                 menu_identification_value_start_character != first_menu_identification_value_character) {
+                 !IsIllegalTagOrAttributeCharacter(
+                     menu_identification_value_start_character) &&
+                 menu_identification_value_start_character !=
+                 first_menu_identification_value_character) {
             menu_identification_value_start_character = FileGet();
           }
           if (IsFatalFileError()) {
@@ -429,12 +434,15 @@ Menu::FindState Menu::FindMenuIdentificationValueOrParseLegalOrDie() {
             return kFatalError;
           }
         }
-        if (menu_identification_value_start_character == first_menu_identification_value_character) {
+        if (menu_identification_value_start_character ==
+            first_menu_identification_value_character) {
           menu_identification_value_start_character = FileGet();
           if (IsBadOrEndOfFile()) {
             return kFatalError;
           }
-          switch (menu_identification_value_start_character) { // TODO (Matthew) this exists in FindMenuTagStartOrParseLegalOrDie
+          switch (menu_identification_value_start_character) { // TODO (Matthew)
+                                                               // this exists in
+                                                               // FindMenuTagStartOrParseLegalOrDie
             case ' ': {
               switch(ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
                 case kFatalError: {
@@ -568,6 +576,66 @@ int Menu::RequestOrDie() {
             "\". Press Enter to continue.";
             cin.ignore();
 #endif
+            pair<FindState, string> tmp = GetLegalTagOrDie();
+            switch (tmp.first) {
+              case kFatalError: {
+                return false;
+              }
+              case kParsedLegal: {
+                if (tmp.second.empty()) {
+                  cout <<
+                  "Error: the tag buffer string at line " <<
+                  line <<
+                  " and column " <<
+                  column <<
+                  " of the file \"" <<
+                  file_name <<
+                  "\" is empty. Press Enter to exit.";
+                  cin.ignore();
+                  return false;
+                }
+                string tag(tmp.second, tmp.second.length() - 1);
+                char tag_end_character = tmp.second->back();
+                switch (tag) {
+                  case "description": {
+                    switch (ParseLegalAttributesUntilTagEndOrDie(
+                        tag_end_character)) {
+                      case kFatalError: {
+                        return false;
+                      }
+                      case kParsedLegal: {
+                        tag_end_character = FileGet();
+                        while (!IsFatalFileError() &&
+                               !IsIllegalCharacter(tag_end_character) &&) {
+                          description += tag_end_character;
+                          tag_end_character = FileGet();
+                        }
+                        if (IsBadOrEndOfFile()) {
+                          return false;
+                        }
+                        if (IsIllegalCharacter(tag_end_character) &&
+                            tag_end_character != '<') {
+                          IsFatalCharacterError(tag_end_character);
+                          return false;
+                        }
+                        
+                      }
+                      default: {
+                        return false;
+                      }
+                    }
+                  }
+                  case "option": {
+                  }
+                  default: {
+                    switch (  // TODO (Matthew)
+                  }
+                }
+              }
+              default: {
+                return false;
+              }
+            }
             return 1;
           }
           case kParsedLegal: {
@@ -650,4 +718,30 @@ int Menu::RequestOrDie() {
     current_character = FileGet();
   }
   return 0;
+}
+pair<Menu::FindState, string> Menu::GetLegalTagOrDie() {
+  char tag_character = FileGet();
+  string tag_buffer_string;
+  if (IsFatalFileError()) {
+    return make_pair(kFatalError, tag_buffer_string);
+  }
+  if (IsFatalTagOrAttributeStartError(tag_character)) {
+    tag_buffer_string = tag_character;
+    return make_pair(kFatalError, tag_buffer_string);
+  }
+  do {
+    tag_buffer_string = tag_character;
+    tag_character = FileGet();
+  }
+  while (!IsFatalFileError() &&
+         !IsFatalTagOrAttributeCharacterError(tag_character));
+  if (IsBadOrEndOfFile()) {
+    return make_pair(kFatalError, tag_buffer_string);
+  }
+  if (IsIllegalTagOrAttributeCharacter(tag_character) &&
+      tag_character != ' ' &&
+      tag_character != '>') {
+    return make_pair(kFatalError, tag_buffer_string + tag_character);
+  }
+  return make_pair(kParsedLegal, tag_buffer_string + tag_character);
 }
