@@ -157,22 +157,10 @@ bool Menu::IsFatalCharacterError(char c) {
   }
   return false;
 }
-pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
-    char attribute_end_character) {
+pair<bool, char> Menu::IsFatalApostropheOrQuotationMarkError() {
+  char attribute_end_character = FileGet();
   if (IsFatalFileError()) {
-    return make_pair(kFatalError, attribute_end_character);
-  }
-  if (IsIllegalTagOrAttributeCharacter(attribute_end_character)
-      && attribute_end_character != '=') {
-    IllegalTagOrAttributeCharacter(attribute_end_character);
-    return make_pair(kFatalError, attribute_end_character);
-  }
-  /* Attribute values must open either with an apostrophe or a
-   * quotation mark.
-   */
-  attribute_end_character = FileGet();
-  if (IsFatalFileError()) {
-    return make_pair(kFatalError, attribute_end_character);
+    return make_pair(true, attribute_end_character);
   }
   if (attribute_end_character != '\'' && attribute_end_character != '\"') {
     cout <<
@@ -186,11 +174,49 @@ pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
     file_name <<
     "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
     cin.ignore();
+    return make_pair(true, attribute_end_character);
+  }
+  return make_pair(false, attribute_end_character);
+}
+pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
+    char attribute_end_character) {
+  if (IsFatalFileError()) {
     return make_pair(kFatalError, attribute_end_character);
   }
-  /* Attribute values must open and close with the same thing.
+  if (IsIllegalTagOrAttributeCharacter(attribute_end_character)
+      && attribute_end_character != '=') {
+    IllegalTagOrAttributeCharacter(attribute_end_character);
+    return make_pair(kFatalError, attribute_end_character);
+  }
+  /* Attribute values must open either with an apostrophe or a
+   * quotation mark.
    */
-  char attribute_value_start = attribute_end_character;
+//  attribute_end_character = FileGet();
+//  if (IsFatalFileError()) {
+//    return make_pair(kFatalError, attribute_end_character);
+//  }
+//  if (attribute_end_character != '\'' && attribute_end_character != '\"') {
+//    cout <<
+//    "Error: \'" <<
+//    attribute_end_character <<
+//    "\' at line " <<
+//    line <<
+//    " and column " <<
+//    column <<
+//    " of the file \"" <<
+//    file_name <<
+//    "\" is not an apostrophe or a quotation mark. Press Enter to exit.";
+//    cin.ignore();
+//    return make_pair(kFatalError, attribute_end_character);
+//  }
+//  /* Attribute values must open and close with the same thing.
+//   */
+//  char attribute_value_start = attribute_end_character;
+  pair<bool, char> tmp = IsFatalApostropheOrQuotationMarkError();
+  if (tmp.first) {
+    return make_pair(kFatalError, tmp.second);
+  }
+  char attribute_value_start = tmp.second;
   do {
     attribute_end_character = FileGet();
   }
@@ -319,7 +345,7 @@ Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
         case '>': {
           return kParsedLegal;
         }
-        default: {
+        default: { // TODO (Matthew) make a unique function for this error
           if (IsFatalTagOrAttributeCharacterError(tag_start_character)) {
             return kFatalError;
           }
@@ -331,7 +357,7 @@ Menu::FindState Menu::FindMenuTagStartOrParseLegalOrDie() {
     }
   }
 } 
-Menu::FindState Menu::FoundMenuTag() {
+Menu::FindState Menu::FindMenuIdentificationValueOrParseLegalOrDie() {
 #ifdef DEBUG
   cout <<
   "The start of a menu tag is found at line " <<
@@ -360,25 +386,115 @@ Menu::FindState Menu::FoundMenuTag() {
         " of the file \"" <<
         file_name <<
         "\". Press Enter to continue.";
+        cin.ignore();
 #endif
-        return kFound;
+        pair<bool, char> tmp = IsFatalApostropheOrQuotationMarkError();
+        bool found = true;
+        if (tmp.first) {
+          return kFatalError;
+        }
+        char first_menu_identification_value_character = tmp.second;
+        char menu_identification_value_start_character = FileGet();
+        string menu_identification_value = menu_name +
+        first_menu_identification_value_character;
+        if (menu_identification_value_start_character != menu_identification_value[0]) {
+          if (IsFatalCharacterError(menu_identification_value_start_character)) {
+            return kFatalError;
+          }
+          found = false;
+        }
+        if (found) {
+          for (unsigned int start_element = 1;
+               start_element < menu_identification_value.length();
+               ++start_element) {
+            menu_identification_value_start_character = FileGet();
+            if (menu_identification_value_start_character != menu_identification_value[start_element]) {
+              found = false;
+              break;
+            }
+          }
+        }
+        if (!found) {
+          while (!IsBadOrEndOfFile() &&
+                 !IsIllegalTagOrAttributeCharacter(menu_identification_value_start_character) &&
+                 menu_identification_value_start_character != first_menu_identification_value_character) {
+            menu_identification_value_start_character = FileGet();
+          }
+          if (IsFatalFileError()) {
+            return kFatalError;
+          }
+          if (IsIllegalCharacter(menu_identification_value_start_character) &&
+              menu_identification_value_start_character !=
+              first_menu_identification_value_character) {
+            return kFatalError;
+          }
+        }
+        if (menu_identification_value_start_character == first_menu_identification_value_character) {
+          menu_identification_value_start_character = FileGet();
+          if (IsBadOrEndOfFile()) {
+            return kFatalError;
+          }
+          switch (menu_identification_value_start_character) { // TODO (Matthew) this exists in FindMenuTagStartOrParseLegalOrDie
+            case ' ': {
+              switch(ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
+                case kFatalError: {
+                  return kFatalError;
+                }
+                case kParsedLegal: {
+                  if(found) {
+                    return kFound;
+                  }
+                  return kParsedLegal;
+                }
+                default: {
+                  return kFatalError;
+                }
+              }
+            }
+            case '>': {
+              if (found) {
+                return kFound;
+              }
+              return kParsedLegal;
+            }
+            default: {
+              // TODO (Matthew) make a unique function for this error
+              return kFatalError;
+            }
+          }
+          switch(ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
+            case kFatalError: {
+              return kFatalError;
+            }
+            case kParsedLegal: {
+              if(found) {
+                return kFound;
+              }
+              return kParsedLegal;
+            }
+            default: {
+              return kFatalError;
+            }
+          }
+        }
+        return kFatalError;
       }
       case kParsedLegal: {
-        char menu_identification_attribute_start_character = tmp.second;
+        char attribute_end_character = tmp.second;
         while (!IsBadOrEndOfFile() &&
                !IsIllegalTagOrAttributeCharacter(
-                   menu_identification_attribute_start_character)) {
-          menu_identification_attribute_start_character = FileGet();
+                   attribute_end_character)) {
+          attribute_end_character = FileGet();
         }
         tmp = ParseLegalAttributeEndOrDie(
-            menu_identification_attribute_start_character);
+            attribute_end_character);
         switch (tmp.first) {
           case kFatalError: {
             return kFatalError;
           }
           case kParsedLegal: {
-            menu_identification_attribute_start_character = tmp.second;
-            switch (menu_identification_attribute_start_character) {
+            attribute_end_character = tmp.second;
+            switch (attribute_end_character) {
               case ' ': {
                 continue;
               }
@@ -387,7 +503,7 @@ Menu::FindState Menu::FoundMenuTag() {
               }
               default: {
                 if (IsFatalTagOrAttributeCharacterError(
-                    menu_identification_attribute_start_character)) {
+                    attribute_end_character)) {
                   return kFatalError;
                 }
               }
@@ -399,7 +515,7 @@ Menu::FindState Menu::FoundMenuTag() {
           }
         }
         switch (ParseLegalAttributesUntilTagEndOrDie(
-            menu_identification_attribute_start_character)) {
+            attribute_end_character)) {
           case kFatalError: {
             return kFatalError;
           }
@@ -434,8 +550,33 @@ int Menu::RequestOrDie() {
         return 0;
       }
       case kFound: {
-        FoundMenuTag();
-        return 1;
+        switch (FindMenuIdentificationValueOrParseLegalOrDie()) {
+          case kFatalError: {
+            return 0;
+          }
+          case kFound: {
+#ifdef DEBUG
+            cout <<
+            "A menu of the name \"" <<
+            menu_name <<
+            "\" is found on line " <<
+            line <<
+            " and column " <<
+            column <<
+            " of the file \"" <<
+            file_name <<
+            "\". Press Enter to continue.";
+            cin.ignore();
+#endif
+            return 1;
+          }
+          case kParsedLegal: {
+            break;
+          }
+          default: {
+            return 0;
+          }
+        }
       }
       case kParsedLegal: {
         break;
@@ -467,8 +608,33 @@ int Menu::RequestOrDie() {
           return 0;
         }
         case kFound: {
-          FoundMenuTag();
-          return 1;
+          switch (FindMenuIdentificationValueOrParseLegalOrDie()) {
+            case kFatalError: {
+              return 0;
+            }
+            case kFound: {
+#ifdef DEBUG
+              cout <<
+              "A menu of the name \"" <<
+              menu_name <<
+              "\" is found on line " <<
+              line <<
+              " and column " <<
+              column <<
+              " of the file \"" <<
+              file_name <<
+              "\". Press Enter to continue.";
+              cin.ignore();
+#endif
+              return 1;
+            }
+            case kParsedLegal: {
+              break;
+            }
+            default: {
+              return 0;
+            }
+          }
         }
         case kParsedLegal: {
           break;

@@ -6,10 +6,15 @@ int main() {
   Menu foo("root.xml", "foo");
   switch (foo.RequestOrDie()) {
     case 0: {
+      cout <<
+      "Fatal error on line " <<
+      foo.line <<
+      " and column " <<
+      foo.column <<
+      ". Press Enter to exit.";
       return EXIT_FAILURE;
     }
     case 1: {
-      cin.ignore();
       return EXIT_SUCCESS;
     }
     default: {

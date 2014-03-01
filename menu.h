@@ -10,6 +10,8 @@
 using namespace std;
 class Menu {
  public:
+  unsigned int line;
+  unsigned int column;
   Menu(const char *, const char *);
   int RequestOrDie();
  private:
@@ -29,6 +31,7 @@ class Menu {
   char FileGet();
   bool IsIllegalTagOrAttributeStart(char);
   bool IsFatalTagOrAttributeStartError(char);
+  pair<bool, char> IsFatalApostropheOrQuotationMarkError();
   pair<FindState, char> ParseLegalAttributeEndOrDie(char);
   FindState ParseLegalAttributesUntilTagEndOrDie(char);
   pair<FindState, char> FindStartOrParseLegalOrDie(const char *);
@@ -38,11 +41,9 @@ class Menu {
   bool IsIllegalCharacter(char);
   bool IsFatalCharacterError(char);
   FindState FindMenuTagStartOrParseLegalOrDie();
-  FindState FoundMenuTag();
+  FindState FindMenuIdentificationValueOrParseLegalOrDie();
   const string file_name;
   const string menu_name;
   ifstream menu_file;
-  unsigned int line;
-  unsigned int column;
 };
 #endif
