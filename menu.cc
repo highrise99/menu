@@ -235,7 +235,7 @@ pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
   return make_pair(kParsedLegal, FileGet());
 }
 Menu::FindState Menu::ParseLegalAttributesUntilTagEndOrDie(char c) {
-  while (!IsBadOrEndOfFile() && c != '>') {
+  while (!IsBadOrEndOfFile() && c == ' ') {
     /* Attributes must start with a letter or an underscore.
      */
     c = FileGet();
@@ -267,6 +267,9 @@ Menu::FindState Menu::ParseLegalAttributesUntilTagEndOrDie(char c) {
         return kFatalError;
       }
     }
+  }
+  if (c != '>') {
+    return kFatalError;
   }
   return kParsedLegal;
 }
