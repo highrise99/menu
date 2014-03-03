@@ -3,22 +3,23 @@
 #include <string>
 #include <utility>
 #include "new_menu.h"
+#define DEBUG
 using namespace std;
 Menu::Menu(const char *constructor_file_name, const char *constructor_menu_name)
     : file_name_(constructor_file_name),
       menu_name_(constructor_menu_name),
       line_(1),
       column_(0) {}
-Menu::FindState Menu::AnalyzeTag() {
+pair<Menu::FindState, char> Menu::AnalyzeTag() {
   char buffer_character = FileGet();
   if (IsFatalFileError()) {
-    return kFatalError;
+    return make_pair(kFatalError, NULL);
   }
   if (buffer_character == '<') {
     pair<FindState, string> tmp = GetLegalTagOrAttributeOrDie();
     switch (tmp.first) {
       case kFatalError: {
-        return kFatalError;
+        return make_pair(kFatalError, NULL);
       }
       case kParsedLegal: {
 //        if (tmp.second.empty()) {
@@ -27,44 +28,60 @@ Menu::FindState Menu::AnalyzeTag() {
         string tag(tmp.second, 0, tmp.second.length() - 1);
 //        buffer_character = tmp.second.back();
         if (tmp.second.empty()) { // TODO (Matthew) add an error message
-          return kFatalError;
+#ifdef DEBUG
+          cout << "tag buffer is empty! ";
+          cin.ignore();
+#endif
+          return make_pair(kFatalError, NULL);
         }
         buffer_character = tmp.second.back();
+#ifdef DEBUG
+        cout << "the tag is \"" << tag << "\". ";
+        cin.ignore();
+#endif
         if (tag == "menu") { // TODO (Matthew) implement this as a function here
                              // and if the tag is "option"
+#ifdef DEBUG
+          cout << "a menu tag is found--not necessarily of the specified name ";
+          cin.ignore();
+#endif
           if (buffer_character != ' ') { // TODO (Matthew) add an error message
-            return kFatalError;
+            return make_pair(kFatalError, NULL);
           }
           while (!IsBadOrEndOfFile()) {
             tmp = GetLegalTagOrAttributeOrDie();
             switch (tmp.first) {
               case kFatalError: {
-                return kFatalError;
+                return make_pair(kFatalError, NULL);
               }
               case kParsedLegal: {
                 string menu_attribute(tmp.second,
-                          tmp.second.begin(),
+                          0,
                           tmp.second.length() - 1);
                 if (menu_attribute == "id") {
+#ifdef DEBUG
+                  cout << "a menu identification tag is found here ";
+                  cin.ignore();
+#endif
                   if (tmp.second.empty()) { // TODO (Matthew) add an error
                                             // message
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   buffer_character = tmp.second.back();
                   if (buffer_character != '=') { // TODO (Matthew) add an error
                                                  // message
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   pair<bool, char> tmp =
                   IsFatalApostropheOrQuotationMarkError();
                   if (tmp.first) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   // TODO (Matthew) add the following as a function here and in
                   // GetLegalTagOrAttributeOrDie
                   buffer_character = FileGet();
                   if (IsFatalFileError()) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   string menu_identification_attribute_value;
                   while (!IsFatalFileError() &&
@@ -73,118 +90,118 @@ Menu::FindState Menu::AnalyzeTag() {
                     buffer_character = FileGet();
                   }
                   if (IsBadOrEndOfFile()) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   if (IsIllegalCharacter(buffer_character) &&
                       buffer_character != tmp.second) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
-                  switch (ParseLegalAttributesUntilEndOrDie(FileGet())) {
+                  switch (ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
                     case kFatalError: {
-                      return kFatalError;
+                      return make_pair(kFatalError, NULL);
                     }
                     case kParsedLegal: {
                       // TODO (Matthew) add the menu tag to the stack
-                      if (menu_identification_attribute_value == menu_name) {
+                      if (menu_identification_attribute_value == menu_name_) {
 #ifdef DEBUG
                       cout <<
                       "A menu of the name \"" <<
-                      menu_name <<
+                      menu_name_ <<
                       "\" is found on line " <<
-                      line <<
+                      line_ <<
                       " and column " <<
-                      column <<
+                      column_ <<
                       " of the file \"" <<
-                      file_name <<
+                      file_name_ <<
                       "\". Press Enter to continue.";
                       cin.ignore();
 #endif
-                        return kFound;
+                        return make_pair(kFound, NULL);
                       }
-                      return kParsedLegal;
+                      return make_pair(kParsedLegal, buffer_character);
                     }
                     default: { // TODO (Matthew) add an error message as a
                                // function
-                      return kFatalError;
+                      return make_pair(kFatalError, NULL);
                     }
                   }
                 }
                 buffer_character = FileGet();
                 if (IsFatalFileError()) {
-                  return kFatalError;
+                  return make_pair(kFatalError, NULL);
                 }
                 if (buffer_character != ' ') { // TODO (Matthew) add an error
                                                // message
-                  return kFatalError;
+                  return make_pair(kFatalError, NULL);
                 }
               }
               default: { // TODO (Matthew) add an error message as a function
-                return kFatalError;
+                return make_pair(kFatalError, NULL);
               }
             }
           }
-          return kFatalError;  // TODO (Matthew) add an error message
+          return make_pair(kFatalError, NULL);  // TODO (Matthew) add an error message
         }
         else if (tag == "description") {
-          switch (ParseLegalAttributesUntilEndOrDie(buffer_character)) {
+          switch (ParseLegalAttributesUntilTagEndOrDie(buffer_character)) {
             case kFatalError: {
-              return kFatalError;
+              return make_pair(kFatalError, NULL);
             }
             case kParsedLegal: {
               // TODO (Matthew) add the description tag to the stack
 #ifdef DEBUG
               cout <<
               "A description tag is found at line " <<
-              line <<
+              line_ <<
               " and column " <<
-              column <<
+              column_ <<
               " of the file \"" <<
-              file_name <<
+              file_name_ <<
               "\". Press Enter to continue.";
               cin.ignore();
 #endif
-              return kParsedLegal;
+              return make_pair(kParsedLegal, buffer_character);
             }
             default: { // TODO (Matthew) add an error message as a function
-              return kFatalError;
+              return make_pair(kFatalError, NULL);
             }
           }
         }
         else if (tag == "option") { // TODO (Matthew) implement this as a
                                     // function here and if the tag is "menu"
           if (buffer_character != ' ') { // TODO (Matthew) add an error message
-            return kFatalError;
+            return make_pair(kFatalError, NULL);
           }
           while (!IsBadOrEndOfFile()) {
             tmp = GetLegalTagOrAttributeOrDie();
             switch (tmp.first) {
               case kFatalError: {
-                return kFatalError;
+                return make_pair(kFatalError, NULL);
               }
               case kParsedLegal: {
-                menu_attribute(tmp.second,
-                          tmp.second.first(),
+                string menu_attribute(tmp.second,
+                          0,
                           tmp.second.length() - 1);
                 if (menu_attribute == "id") {
                   if (tmp.second.empty()) { // TODO (Matthew) add an error
                                             // message
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   buffer_character = tmp.second.back();
                   if (buffer_character != '=') { // TODO (Matthew) add an error
                                                  // message
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   pair<bool, char> tmp =
                   IsFatalApostropheOrQuotationMarkError();
                   if (tmp.first) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   // TODO (Matthew) add the following as a function here and in
                   // GetLegalTagOrAttributeOrDie
                   buffer_character = FileGet();
                   if (IsFatalFileError()) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   string menu_identification_attribute_value;
                   while (!IsFatalFileError() &&
@@ -193,15 +210,15 @@ Menu::FindState Menu::AnalyzeTag() {
                     buffer_character = FileGet();
                   }
                   if (IsBadOrEndOfFile()) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   if (IsIllegalCharacter(buffer_character) &&
                       buffer_character != tmp.second) {
-                    return kFatalError;
+                    return make_pair(kFatalError, NULL);
                   }
                   switch (ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
                     case kFatalError: {
-                      return kFatalError;
+                      return make_pair(kFatalError, NULL);
                     }
                     case kParsedLegal: {
                       int option_identification;
@@ -212,70 +229,73 @@ Menu::FindState Menu::AnalyzeTag() {
                                                                  // (Matthew)
                                                                  // add an error
                                                                  // message
-                        return kFatalError;
+                        return make_pair(kFatalError, NULL);
                       }
                       if (option_identification <= 0) { // TODO (Matthew) add an
                                                         // error message
-                        return kFatalError;
+                        return make_pair(kFatalError, NULL);
                       }
                       // TODO (Matthew) add the option tag to the stack and
                       // handle the id somehow
-                      return kFound;
+                      return make_pair(kFound, NULL);
 #ifdef DEBUG
                       cout <<
                       "An option tag is found at line " <<
-                      line <<
+                      line_ <<
                       " and column " <<
-                      column <<
+                      column_ <<
                       " of the file \"" <<
-                      file_name <<
+                      file_name_ <<
                       "\". Press Enter to continue.";
                       cin.ignore();
 #endif
                     }
                     default: { // TODO (Matthew) add an error message as a
                                // function
-                      return kFatalError;
+                      return make_pair(kFatalError, NULL);
                     }
                   }
                 }
                 buffer_character = FileGet();
                 if (IsFatalFileError()) {
-                  return kFatalError;
+                  return make_pair(kFatalError, NULL);
                 }
                 if (buffer_character != ' ') { // TODO (Matthew) add an error
                                                // message
-                  return kFatalError;
+                  return make_pair(kFatalError, NULL);
                 }
               }
               default: { // TODO (Matthew) add an error message as a function
-                return kFatalError;
+                return make_pair(kFatalError, NULL);
               }
             }
           }
-          return kFatalError;  // TODO (Matthew) add an error message
+          return make_pair(kFatalError, NULL);  // TODO (Matthew) add an error message
         }
         // TODO (Matthew) parse legal tag end or die
         switch (ParseLegalAttributesUntilTagEndOrDie(buffer_character)) {
           case kFatalError: {
-            return kFatalError;
+            return make_pair(kFatalError, NULL);
           }
           case kParsedLegal: {
             // TODO (Matthew) add the tag to the stack
-            return kParsedLegal;
+            return make_pair(kParsedLegal, buffer_character);
           }
           default: { // TODO (Matthew) add an error message as a function
-            return kFatalError;
+            return make_pair(kFatalError, NULL);
           }
         }
         break;
       }
       default: {
-        return kFatalError;
+        return make_pair(kFatalError, NULL);
       }
     }
   }
-  return kParsedLegal;
+  if (buffer_character == '&') {
+    return make_pair(kFatalError, NULL);
+  }
+  return make_pair(kParsedLegal, buffer_character);
 }
 void Menu::BadFile() {
   cout <<
@@ -287,6 +307,9 @@ void Menu::BadFile() {
   column_ <<
   ". Press Enter to exit.";
   cin.ignore();
+}
+int Menu::column() {
+  return column_;
 }
 char Menu::FileGet() {
   char c = menu_file_.get();
@@ -310,7 +333,7 @@ pair<Menu::FindState, string> Menu::GetLegalTagOrAttributeOrDie() {
     return make_pair(kFatalError, tag_buffer_string);
   }
   do {
-    tag_buffer_string = tag_character;
+    tag_buffer_string += tag_character;
     tag_character = FileGet();
   }
   while (!IsFatalFileError() &&
@@ -318,7 +341,13 @@ pair<Menu::FindState, string> Menu::GetLegalTagOrAttributeOrDie() {
   if (IsBadOrEndOfFile()) {
     return make_pair(kFatalError, tag_buffer_string);
   }
+#ifdef DEBUG
+  cout << "the tag character is \'" << tag_character << "\' ";
+#endif
   return make_pair(kParsedLegal, tag_buffer_string + tag_character);
+}
+int Menu::line() {
+  return line_;
 }
 Menu::FileState Menu::IsBadOrEndOfFile() {
   if (!menu_file_) {
@@ -350,8 +379,51 @@ pair<bool, char> Menu::IsFatalApostropheOrQuotationMarkError() {
   }
   return make_pair(false, attribute_end_character);
 }
+bool Menu::IsFatalCharacterError(char c) {
+  if (IsIllegalCharacter(c)) {
+    cout <<
+    "Error: the character \'" <<
+    c <<
+    "\' at line " <<
+    line_ <<
+    " and column " <<
+    column_ <<
+    " of the file \"" <<
+    file_name_ <<
+    "\" is an illegal character. Press Enter to exit.";
+    cin.ignore();
+    return true;
+  }
+  return false;
+}
+bool Menu::IsFatalFileError() {
+  switch (IsBadOrEndOfFile()) {
+    case kGood: {
+      return false;
+    }
+    case kBad: {
+      BadFile();
+      return true;
+    }
+    case kEndOf: {
+      cout <<
+      "Error: the file \"" <<
+      file_name_ <<
+      "\" ends at line " <<
+      line_ <<
+      " and column " <<
+      column_ <<
+      ". Press Enter to exit.";
+      cin.ignore();
+      return true;
+    }
+    default: {
+      return true;
+    }
+  }
+}
 bool Menu::IsFatalTagOrAttributeStartError(char first_start_character) {
-  if (IsIllegalTagOrAttributeStartCharacter(first_start_character)) {
+  if (IsIllegalTagOrAttributeStart(first_start_character)) {
     cout <<
     "Error: the character \'" <<
     first_start_character <<
@@ -380,13 +452,25 @@ bool Menu::IsIllegalTagOrAttributeCharacter(char start_character) {
   }
   return false;
 }
+// TODO (Matthew) Add support for comments.
+bool Menu::IsIllegalTagOrAttributeStart(char first_start_character) {
+  if (!isalpha(first_start_character) && first_start_character != '_') {
+    return true;
+  }
+  return false;
+}
 bool Menu::LoadOrDie() {
   menu_file_.open(file_name_.c_str());
   if (!menu_file_) {
     BadFile();
     return 0;
   }
-  switch (AnalyzeTag()) {
+#ifdef DEBUG
+  cout << "analyzing tags... ";
+  cin.ignore();
+#endif
+  pair<FindState, char> tmp = AnalyzeTag();
+  switch (tmp.first) {
     case kFatalError: {
       return false;
     }
@@ -394,9 +478,6 @@ bool Menu::LoadOrDie() {
       return true;
     }
     case kParsedLegal: {
-      if (tmp.second != '<') {
-        return false;
-      }
       break;
     }
     default: { // TODO (Matthew) add an error message as a function
@@ -404,7 +485,8 @@ bool Menu::LoadOrDie() {
     }
   }
   while (!IsFatalFileError()) { // TODO (Matthew) add an expression
-    switch (AnalyzeTag()) {
+    tmp = AnalyzeTag();
+    switch (tmp.first) {
       case kFatalError: {
         return false;
       }
@@ -428,7 +510,7 @@ pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
   }
   if (IsIllegalTagOrAttributeCharacter(attribute_end_character)
       && attribute_end_character != '=') {
-    IllegalTagOrAttributeCharacter(attribute_end_character);
+    // TODO (Matthew) add an error message
     return make_pair(kFatalError, attribute_end_character);
   }
   /* Attribute values must open either with an apostrophe or a
@@ -503,6 +585,10 @@ Menu::FindState Menu::ParseLegalAttributesUntilTagEndOrDie(char c) {
     }
   }
   if (c != '>') {
+#ifdef DEBUG
+    cout << "for some reason, the tag character is not what it is ";
+    cin.ignore();
+#endif
     return kFatalError;
   }
   return kParsedLegal;

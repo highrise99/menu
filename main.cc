@@ -1,17 +1,18 @@
 #include <cstdlib>
 #include <iostream>
-#include "menu.h"
+#include "new_menu.h"
 using namespace std;
 int main() {
   Menu foo("root.xml", "foo");
-  switch (foo.RequestOrDie()) {
+  switch (foo.LoadOrDie()) {
     case 0: {
       cout <<
       "Fatal error on line " <<
-      foo.line <<
+      foo.line() <<
       " and column " <<
-      foo.column <<
+      foo.column() <<
       ". Press Enter to exit.";
+      cin.ignore();
       return EXIT_FAILURE;
     }
     case 1: {
