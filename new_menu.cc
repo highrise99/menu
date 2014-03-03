@@ -49,25 +49,31 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
             return make_pair(kFatalError, NULL);
           }
           while (!IsBadOrEndOfFile()) {
-            tmp = GetLegalTagOrAttributeOrDie();
-            switch (tmp.first) {
+            pair<FindState, string> *tmp = new pair<FindState, string>;
+            *tmp = GetLegalTagOrAttributeOrDie();
+            switch (tmp->first) {
               case kFatalError: {
+                delete tmp;
                 return make_pair(kFatalError, NULL);
               }
               case kParsedLegal: {
-                string menu_attribute(tmp.second,
+                string menu_attribute(tmp->second,
                           0,
-                          tmp.second.length() - 1);
+                          tmp->second.length() - 1);
+#ifdef DEBUG
+                cout << "the menu attribute is \"" << menu_attribute << "\". ";
+#endif
                 if (menu_attribute == "id") {
 #ifdef DEBUG
                   cout << "a menu identification tag is found here ";
                   cin.ignore();
 #endif
-                  if (tmp.second.empty()) { // TODO (Matthew) add an error
+                  if (tmp->second.empty()) { // TODO (Matthew) add an error
                                             // message
                     return make_pair(kFatalError, NULL);
                   }
-                  buffer_character = tmp.second.back();
+                  buffer_character = tmp->second.back();
+                  delete tmp;
                   if (buffer_character != '=') { // TODO (Matthew) add an error
                                                  // message
                     return make_pair(kFatalError, NULL);
@@ -85,15 +91,12 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                   }
                   string menu_identification_attribute_value;
                   while (!IsFatalFileError() &&
-                         !IsIllegalCharacter(buffer_character)) {
+                         !IsFatalCharacterError(buffer_character) &&
+                         buffer_character != tmp.second) {
                     menu_identification_attribute_value += buffer_character;
                     buffer_character = FileGet();
                   }
-                  if (IsBadOrEndOfFile()) {
-                    return make_pair(kFatalError, NULL);
-                  }
-                  if (IsIllegalCharacter(buffer_character) &&
-                      buffer_character != tmp.second) {
+                  if (IsBadOrEndOfFile() || buffer_character != tmp.second) {
                     return make_pair(kFatalError, NULL);
                   }
                   switch (ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
@@ -126,16 +129,33 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                     }
                   }
                 }
-                buffer_character = FileGet();
-                if (IsFatalFileError()) {
+                if (tmp->second.empty()) { // TODO (Matthew) add an error
+                                           // message
                   return make_pair(kFatalError, NULL);
                 }
-                if (buffer_character != ' ') { // TODO (Matthew) add an error
-                                               // message
-                  return make_pair(kFatalError, NULL);
+                buffer_character = tmp->second.back();
+                delete tmp;
+                pair<FindState, char> *tmp = new pair<FindState, char>;
+                *tmp = ParseLegalAttributeEndOrDie(buffer_character);
+                switch (tmp->first) {
+                  case kFatalError: {
+                    delete tmp;
+                    return make_pair(kFatalError, NULL);
+                  }
+                  case kParsedLegal: {
+                    buffer_character = tmp->second;
+                    delete tmp;
+                    break;
+                  }
+                  default: {
+                    delete tmp;
+                    return make_pair(kFatalError, NULL);
+                  }
                 }
+                break;
               }
               default: { // TODO (Matthew) add an error message as a function
+                delete tmp;
                 return make_pair(kFatalError, NULL);
               }
             }
@@ -173,21 +193,25 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
             return make_pair(kFatalError, NULL);
           }
           while (!IsBadOrEndOfFile()) {
-            tmp = GetLegalTagOrAttributeOrDie();
-            switch (tmp.first) {
+            pair<FindState, string> *tmp = new pair<FindState, string>;
+            *tmp = GetLegalTagOrAttributeOrDie();
+            switch (tmp->first) {
               case kFatalError: {
+                delete tmp;
                 return make_pair(kFatalError, NULL);
               }
               case kParsedLegal: {
-                string menu_attribute(tmp.second,
+                string menu_attribute(tmp->second,
                           0,
-                          tmp.second.length() - 1);
+                          tmp->second.length() - 1);
                 if (menu_attribute == "id") {
-                  if (tmp.second.empty()) { // TODO (Matthew) add an error
-                                            // message
+                  if (tmp->second.empty()) { // TODO (Matthew) add an error
+                                             // message
+                    delete tmp;
                     return make_pair(kFatalError, NULL);
                   }
-                  buffer_character = tmp.second.back();
+                  buffer_character = tmp->second.back();
+                  delete tmp;
                   if (buffer_character != '=') { // TODO (Matthew) add an error
                                                  // message
                     return make_pair(kFatalError, NULL);
@@ -256,16 +280,29 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                     }
                   }
                 }
-                buffer_character = FileGet();
-                if (IsFatalFileError()) {
-                  return make_pair(kFatalError, NULL);
+                buffer_character = tmp->second.back();
+                delete tmp;
+                pair<FindState, char> *tmp = new pair<FindState, char>;
+                *tmp = ParseLegalAttributeEndOrDie(buffer_character);
+                switch (tmp->first) {
+                  case kFatalError: {
+                    delete tmp;
+                    return make_pair(kFatalError, NULL);
+                  }
+                  case kParsedLegal: {
+                    buffer_character = tmp->second;
+                    delete tmp;
+                    break;
+                  }
+                  default: {
+                    delete tmp;
+                    return make_pair(kFatalError, NULL);
+                  }
                 }
-                if (buffer_character != ' ') { // TODO (Matthew) add an error
-                                               // message
-                  return make_pair(kFatalError, NULL);
-                }
+                break;
               }
               default: { // TODO (Matthew) add an error message as a function
+                delete tmp;
                 return make_pair(kFatalError, NULL);
               }
             }
@@ -524,17 +561,14 @@ pair<Menu::FindState, char> Menu::ParseLegalAttributeEndOrDie(
   do {
     attribute_end_character = FileGet();
   }
-  while (!IsBadOrEndOfFile() &&
-         !IsIllegalCharacter(attribute_end_character) &&
+  while (!IsFatalFileError() &&
+         !IsFatalCharacterError(attribute_end_character) &&
          attribute_end_character != attribute_value_start);
-  if (IsFatalFileError()) {
+  if (IsBadOrEndOfFile()) {
     return make_pair(kFatalError, attribute_end_character);
   }
-  if (IsIllegalCharacter(attribute_end_character) &&
-      attribute_end_character != attribute_value_start) {
-    if (IsFatalCharacterError(attribute_end_character)) {
-      return make_pair(kFatalError, attribute_end_character);
-    }
+  if (IsIllegalCharacter(attribute_end_character)) {
+    return make_pair(kFatalError, NULL);
   }
   return make_pair(kParsedLegal, FileGet());
 }
