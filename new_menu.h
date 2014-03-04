@@ -1,8 +1,10 @@
 #ifndef MENU_MENU_H_
 #define MENU_MENU_H_
+#include <deque>
 #include <fstream>
 #include <string>
 #include <utility>
+#include <vector>
 using namespace std;
 class Menu {
  public:
@@ -34,13 +36,19 @@ class Menu {
   bool IsIllegalCharacter(char);
   bool IsIllegalTagOrAttributeCharacter(char);
   bool IsIllegalTagOrAttributeStart(char);
+  bool OptionIdentifierUsed(const int);
   pair<FindState, char> ParseLegalAttributeEndOrDie(char);
   pair<FindState, char> ParseLegalAttributeOrDie();
   FindState ParseLegalAttributesUntilTagEndOrDie(char);
-  const string file_name_;
-  const string menu_name_;
-  int line_;
   int column_;
+  string description_;
+  const string file_name_;
+  bool file_open_;
+  int line_;
   ifstream menu_file_;
+  const string menu_name_;
+  bool menu_open_;
+  deque<string> open_tags_;
+  vector<pair<int, string>>options_;
 };
 #endif

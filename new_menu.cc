@@ -7,7 +7,9 @@
 using namespace std;
 Menu::Menu(const char *constructor_file_name, const char *constructor_menu_name)
     : file_name_(constructor_file_name),
+      file_open_(true),
       menu_name_(constructor_menu_name),
+      menu_open_(false),
       line_(1),
       column_(0) {}
 pair<Menu::FindState, char> Menu::AnalyzeTag() {
@@ -39,12 +41,42 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
         cout << "the tag is \"" << tag << "\". ";
         cin.ignore();
 #endif
+        if (tag.front() == '/') {
+          if (buffer_character != '>') {
+            return make_pair(kFatalError, NULL);
+          }
+          string end_tag(tag, 1, tag.length());
+#ifdef DEBUG
+          cout << "front open tag is " << open_tags_.front() << ' ';
+          cin.ignore();
+#endif
+          if (open_tags_.front() != end_tag) {
+            return make_pair(kFatalError, NULL);
+          }
+          if (open_tags_.size() == 1) {
+            file_open_ = false;
+            return make_pair(kParsedLegal, buffer_character);
+          }
+          open_tags_.pop_front();
+          if (end_tag == "menu") {
+            menu_open_ = false;
+          }
+#ifdef DEBUG
+          cout << "after popping the front tag is " << open_tags_.front() << ' ';
+          cin.ignore();
+#endif
+          return make_pair(kParsedLegal, buffer_character);
+        }
         if (tag == "menu") { // TODO (Matthew) implement this as a function here
                              // and if the tag is "option"
 #ifdef DEBUG
           cout << "a menu tag is found--not necessarily of the specified name ";
           cin.ignore();
 #endif
+          if (find(open_tags_.begin(), open_tags_.end(), tag) !=
+              open_tags_.end()) {
+            return make_pair(kFatalError, NULL);
+          }
           if (buffer_character != ' ') { // TODO (Matthew) add an error message
             return make_pair(kFatalError, NULL);
           }
@@ -119,8 +151,11 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                       "\". Press Enter to continue.";
                       cin.ignore();
 #endif
-                        return make_pair(kFound, NULL);
+                        open_tags_.push_front(tag);
+                        menu_open_ = true;
+                        return make_pair(kFound, buffer_character);
                       }
+                      open_tags_.push_front(tag);
                       return make_pair(kParsedLegal, buffer_character);
                     }
                     default: { // TODO (Matthew) add an error message as a
@@ -163,6 +198,14 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
           return make_pair(kFatalError, NULL);  // TODO (Matthew) add an error message
         }
         else if (tag == "description") {
+          if (find(open_tags_.begin(), open_tags_.end(), "menu") ==
+              open_tags_.end() ||
+              find(open_tags_.begin(), open_tags_.end(), tag) !=
+              open_tags_.end() ||
+              find(open_tags_.begin(), open_tags_.end(), "option") !=
+              open_tags_.end()) {
+            return make_pair(kFatalError, NULL);
+          }
           switch (ParseLegalAttributesUntilTagEndOrDie(buffer_character)) {
             case kFatalError: {
               return make_pair(kFatalError, NULL);
@@ -180,6 +223,7 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
               "\". Press Enter to continue.";
               cin.ignore();
 #endif
+              open_tags_.push_front(tag);
               return make_pair(kParsedLegal, buffer_character);
             }
             default: { // TODO (Matthew) add an error message as a function
@@ -189,7 +233,23 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
         }
         else if (tag == "option") { // TODO (Matthew) implement this as a
                                     // function here and if the tag is "menu"
+          if (find(open_tags_.begin(), open_tags_.end(), "menu") ==
+              open_tags_.end() ||
+              find(open_tags_.begin(), open_tags_.end(), tag) !=
+              open_tags_.end() ||
+              find(open_tags_.begin(), open_tags_.end(), "description") !=
+              open_tags_.end()) {
+#ifdef DEBUG
+            cout << "something went wrong here ";
+#endif
+            cin.ignore();
+            return make_pair(kFatalError, NULL);
+          }
           if (buffer_character != ' ') { // TODO (Matthew) add an error message
+#ifdef DEBUG
+            cout << "not a space ";
+            cin.ignore();
+#endif
             return make_pair(kFatalError, NULL);
           }
           while (!IsBadOrEndOfFile()) {
@@ -205,6 +265,10 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                           0,
                           tmp->second.length() - 1);
                 if (menu_attribute == "id") {
+#ifdef DEBUG
+                  cout << "id found ";
+                  cin.ignore();
+#endif
                   if (tmp->second.empty()) { // TODO (Matthew) add an error
                                              // message
                     delete tmp;
@@ -214,6 +278,10 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                   delete tmp;
                   if (buffer_character != '=') { // TODO (Matthew) add an error
                                                  // message
+#ifdef DEBUG
+                    cout << "not an equals sign ";
+                    cin.ignore();
+#endif
                     return make_pair(kFatalError, NULL);
                   }
                   pair<bool, char> tmp =
@@ -229,7 +297,8 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                   }
                   string menu_identification_attribute_value;
                   while (!IsFatalFileError() &&
-                         !IsIllegalCharacter(buffer_character)) {
+                         !IsIllegalCharacter(buffer_character) &&
+                         buffer_character != tmp.second) {
                     menu_identification_attribute_value += buffer_character;
                     buffer_character = FileGet();
                   }
@@ -240,6 +309,10 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                       buffer_character != tmp.second) {
                     return make_pair(kFatalError, NULL);
                   }
+#ifdef DEBUG
+                  cout << "the identifier is " << menu_identification_attribute_value << ". ";
+                  cin.ignore();
+#endif
                   switch (ParseLegalAttributesUntilTagEndOrDie(FileGet())) {
                     case kFatalError: {
                       return make_pair(kFatalError, NULL);
@@ -255,13 +328,18 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
                                                                  // message
                         return make_pair(kFatalError, NULL);
                       }
-                      if (option_identification <= 0) { // TODO (Matthew) add an
+                      if (option_identification < 0) { // TODO (Matthew) add an
                                                         // error message
+                        return make_pair(kFatalError, NULL);
+                      }
+                      if (OptionIdentifierUsed(option_identification)) {
                         return make_pair(kFatalError, NULL);
                       }
                       // TODO (Matthew) add the option tag to the stack and
                       // handle the id somehow
-                      return make_pair(kFound, NULL);
+                      open_tags_.push_front(tag);
+                      options_.push_back(make_pair(option_identification, ""));
+                      return make_pair(kParsedLegal, buffer_character);
 #ifdef DEBUG
                       cout <<
                       "An option tag is found at line " <<
@@ -316,6 +394,7 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
           }
           case kParsedLegal: {
             // TODO (Matthew) add the tag to the stack
+            open_tags_.push_front(tag);
             return make_pair(kParsedLegal, buffer_character);
           }
           default: { // TODO (Matthew) add an error message as a function
@@ -331,6 +410,18 @@ pair<Menu::FindState, char> Menu::AnalyzeTag() {
   }
   if (buffer_character == '&') {
     return make_pair(kFatalError, NULL);
+  }
+  if (find(open_tags_.begin(), open_tags_.end(), "description") !=
+      open_tags_.end()) {
+    description_ += buffer_character;
+  }
+  if (find(open_tags_.begin(), open_tags_.end(), "option") !=
+      open_tags_.end()) {
+    // TODO (Matthew) add option logic
+    if (options_.empty()) {
+      return make_pair(kFatalError, NULL);
+    }
+    options_[options_.size() - 1].second += buffer_character;
   }
   return make_pair(kParsedLegal, buffer_character);
 }
@@ -365,7 +456,8 @@ pair<Menu::FindState, string> Menu::GetLegalTagOrAttributeOrDie() {
   if (IsFatalFileError()) {
     return make_pair(kFatalError, tag_buffer_string);
   }
-  if (IsFatalTagOrAttributeStartError(tag_character)) {
+  if (IsIllegalTagOrAttributeStart(tag_character) &&
+      tag_character != '/') {
     tag_buffer_string = tag_character;
     return make_pair(kFatalError, tag_buffer_string);
   }
@@ -512,7 +604,7 @@ bool Menu::LoadOrDie() {
       return false;
     }
     case kFound: {
-      return true;
+      menu_open_ = true;
     }
     case kParsedLegal: {
       break;
@@ -521,14 +613,14 @@ bool Menu::LoadOrDie() {
       return false;
     }
   }
-  while (!IsFatalFileError()) { // TODO (Matthew) add an expression
+  while (file_open_) { // TODO (Matthew) add an expression
     tmp = AnalyzeTag();
     switch (tmp.first) {
       case kFatalError: {
         return false;
       }
       case kFound: {
-        return true;
+        menu_open_ = true;
       }
       case kParsedLegal: {
         break;
@@ -536,6 +628,42 @@ bool Menu::LoadOrDie() {
       default: { // TODO (Matthew) add an error message as a function
         return false;
       }
+    }
+  }
+#ifdef DEBUG
+  cout <<
+  description_ <<
+  endl;
+  int identifier = 1;
+  for (vector<pair<int, string>>::iterator options_iterator = options_.begin();
+       options_iterator < options_.end(); ++options_iterator) {
+    cout <<
+    identifier <<
+    ".\t" <<
+    options_iterator->second <<
+    endl;
+    ++identifier;
+  }
+  cout <<
+  "Input: ";
+  cin.ignore();
+#endif
+  return true;
+}
+bool Menu::OptionIdentifierUsed(const int option_identifier) {
+  for (vector<pair<int, string>>::iterator options_iterator = options_.begin();
+       options_iterator < options_.end(); ++options_iterator) {
+    if (options_iterator->first == option_identifier) {
+      cout <<
+      "Error on line " <<
+      line_ <<
+      " and column " <<
+      column_ <<
+      " of the file " <<
+      file_name_ <<
+      " is already used. Press Enter to exit.";
+      cin.ignore();
+      return true;
     }
   }
   return false;
